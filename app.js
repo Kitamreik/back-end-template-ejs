@@ -1,51 +1,56 @@
-require('dotenv').config();
-const express = require('express');
-const session = require('express-session');
-const passport = require('passport');
+require("dotenv").config(); 
+require("./config/connection"); 
+// require("./config/authStrategy"); 
+const express = require("express");
+const morgan = require("morgan");
+const path = require("node:path");
+const helmet = require("helmet"); 
+const cors = require("cors");
+
+//Move routes before the app initialization
+
 const app = express();
-// const PORT = 3000;
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 
-// Morgan Functionality 
-const morgan = require('morgan');
-app.use(morgan('dev'));
+app.use(helmet()); // protect our app from common hacking practices
+app.use(morgan("dev")); // generate logs of events in the console
+app.use(cors({ credentials: true, origin: true })); //add an object inside the method where it has two parameters, being key value pairs of credentials and origin as keys and the values set to true
 
-// Adding Path module and EJS to app.js 
-const path = require('path');
-
-// Use the Path module to point Node.js to the public directory that contains all of your assets (images, scripts.js, and styles.js) for your project
-app.use(express.static(path.join(__dirname, 'public')));
-
-// Configure Node.js to use EJS as its views engine
-app.set('view engine','ejs');
-
-// Requiring Method Override
-const methodOverride =  require('method-override');
-app.use(methodOverride('_method'));
-
-// Adding Functionality to app.js
-app.use(express.urlencoded({extended: true}));
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname + "/public")));
 
-// Updating app.js to use Express Session and Passport
-app.use(session({
-    secret: process.env.SECRET_KEY,
-    resave: false, 
-    saveUninitialized: false
-}));
 
-app.use(passport.initialize());
-app.use(passport.session());
 
-// Require index-routes
-const indexRoutes = require('./routes/index-routes');
-app.use('/', indexRoutes);
+//Path Check
 
-// Require connection to MongoDB
-require('./config/connection');
 
-//Server
-app.listen(PORT, () => {
-    console.log(`The server is ready and all ears on port ${PORT}!`);
+
+
+//Error handling middleware
+app.use((err, req, res, next) => {
+  const authErrStatus = err.status || 400;
+  const serverErrStatus = err.status || 500;
+
+  if (err.code === 11000) {
+    return res.status(authErrStatus).json({
+      error: { message: "Already have an account? Try logging in." },
+      statusCode: authErrStatus,
+    });
+  }
+
+  return res.status(serverErrStatus).json({
+    error: { message: err.message || "Internal server error." },
+    statusCode: serverErrStatus,
+  });
 });
 
+const comics = require("./data/comicbooks")
+app.get("/", (request, response, next) => {
+  response.status(200).json({success: {message: "Index route works after deployment"}, data: comics, statusCode: 200}); 
+});
+
+app.listen(PORT, () => {
+  console.log(`The server is listening on port ${PORT}`);
+  console.log(`http://localhost:${PORT}/`)
+});
